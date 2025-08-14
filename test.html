@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Socket.IO Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  </head>
+  <body>
+    <h2>Socket.IO Room Test</h2>
+    <button onclick="createRoom()">Create Room</button>
+    <button onclick="showRooms()">Show Active Rooms</button>
+    <button onclick="joinRoom()">Join Room</button>
+    <div
+      id="logs"
+      style="margin-top: 20px; padding: 10px; background: #f0f0f0;"
+    ></div>
+
+    <script>
+      const socket = io("http://localhost:3000");
+
+      socket.on("connect", () => {
+        log("✅ Connected: " + socket.id);
+      });
+
+      socket.on("disconnect", () => {
+        log("❌ Disconnected");
+      });
+
+      function createRoom() {
+        log("🚀 Creating room...");
+        socket.emit("createRoom", {
+          roomId:
+            "TEST" + Math.random().toString(36).substring(2, 5).toUpperCase(),
+          maxPlayers: "3",
+          theme: "numbers",
+          gridSize: "4x4",
+        });
+      }
+
+      function showRooms() {
+        log("📋 Requesting active rooms...");
+        // We'll add this functionality later
+      }
+
+      socket.on("roomCreated", (data) => {
+        log("🎉 Room created: " + JSON.stringify(data, null, 2));
+      });
+
+      function log(msg) {
+        const logs = document.getElementById("logs");
+        logs.innerHTML +=
+          "<div>" + new Date().toLocaleTimeString() + ": " + msg + "</div>";
+        logs.scrollTop = logs.scrollHeight;
+      }
+
+      function joinRoom() {
+        const roomId = prompt("Enter room ID to join:");
+        if (roomId) {
+          log("🚪 Joining room: " + roomId);
+          socket.emit("joinRoom", {
+            roomId,
+            playerName: "Player" + Math.floor(Math.random() * 1000),
+          });
+        }
+      }
+
+      socket.on("playerJoined", (data) => {
+        log("�� Player joined: " + JSON.stringify(data, null, 2));
+      });
+
+      socket.on("roomError", (data) => {
+        log("❌ Room error: " + data.message);
+      });
+    </script>
+  </body>
+</html>

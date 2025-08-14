@@ -1,20 +1,27 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
 import dotenv from "dotenv";
+import {
+  createRoom,
+  joinRoom,
+  getRoom,
+  getAllRooms,
+} from "./utils/roomManager.js";
+
+const activeRooms = new Map();
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: [
+      process.env.FRONTEND_URL || "http://localhost:5173",
+      "http://127.0.0.1:5500",
+      "http://localhost:5500",
+    ],
     methods: ["GET", "POST"],
   },
 });
@@ -31,25 +38,49 @@ app.get("/", (req, res) => {
 });
 
 io.on("connection", (socket) => {
-  console.log(`User connected: ${socket.id}`);
-
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
   });
+
+  socket.on("createRoom", ({ roomId, maxPlayers, theme, gridSize }) => {
+    const room = createRoom(roomId, maxPlayers, theme, gridSize, socket.id);
+    socket.join(roomId);
+    console.log(`Room created: ${roomId} by ${socket.id}`);
+    console.log(`Active rooms: ${activeRooms.entries()}`);
+    socket.emit("roomCreated", { roomId, room });
+  });
+
+  socket.on("joinRoom", ({ roomId, playerName }) => {
+    const room = joinRoom(roomId, socket.id, playerName);
+
+    if (room.error) {
+      socket.emit("roomError", { message: room.error });
+      return;
+    }
+
+    socket.join(roomId);
+
+    console.log(`Player ${socket.id} joined room ${roomId}`);
+    console.log("Active rooms:", Array.from(activeRooms.entries()));
+
+    io.to(roomId).emit("playerJoined", {
+      playerId: socket.id,
+      playerName,
+      currentPlayers: room.currentPlayers,
+      maxPlayers: room.maxPlayers,
+    });
+  });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: "Something went wrong!" });
 });
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-// Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
