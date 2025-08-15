@@ -1,6 +1,10 @@
 const activeRooms = new Map();
 
 export function createRoom(roomId, maxPlayers, theme, gridSize, hostId) {
+  if (activeRooms.has(roomId)) {
+    return { error: "Room already exists" };
+  }
+
   const room = {
     id: roomId,
     maxPlayers: parseInt(maxPlayers),
@@ -13,7 +17,7 @@ export function createRoom(roomId, maxPlayers, theme, gridSize, hostId) {
   };
 
   activeRooms.set(roomId, room);
-  return room;
+  return { success: true, room };
 }
 
 export function joinRoom(roomId, playerId, playerName) {

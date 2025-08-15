@@ -9,8 +9,6 @@ import {
   getAllRooms,
 } from "./utils/roomManager.js";
 
-const activeRooms = new Map();
-
 dotenv.config();
 
 const app = express();
@@ -29,14 +27,6 @@ const io = new Server(server, {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get("/health", (req, res) => {
-  res.json({ status: "healthy", timestamp: new Date().toISOString() });
-});
-
-app.get("/", (req, res) => {
-  res.json({ message: "Memory Game Backend API", status: "running" });
-});
-
 io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
@@ -44,9 +34,14 @@ io.on("connection", (socket) => {
 
   socket.on("createRoom", ({ roomId, maxPlayers, theme, gridSize }) => {
     const room = createRoom(roomId, maxPlayers, theme, gridSize, socket.id);
+
+    if (room.error) {
+      socket.emit("roomError", { message: room.error });
+      return;
+    }
+
     socket.join(roomId);
     console.log(`Room created: ${roomId} by ${socket.id}`);
-    console.log(`Active rooms: ${activeRooms.entries()}`);
     socket.emit("roomCreated", { roomId, room });
   });
 
@@ -61,7 +56,6 @@ io.on("connection", (socket) => {
     socket.join(roomId);
 
     console.log(`Player ${socket.id} joined room ${roomId}`);
-    console.log("Active rooms:", Array.from(activeRooms.entries()));
 
     io.to(roomId).emit("playerJoined", {
       playerId: socket.id,
@@ -72,18 +66,8 @@ io.on("connection", (socket) => {
   });
 });
 
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Something went wrong!" });
-});
-
-app.use((req, res) => {
-  res.status(404).json({ error: "Route not found" });
-});
-
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 Socket.IO server ready for connections`);
-  console.log(`🌐 Health check available at http://localhost:${PORT}/health`);
 });

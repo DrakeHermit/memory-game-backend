@@ -28,8 +28,7 @@
       function createRoom() {
         log("🚀 Creating room...");
         socket.emit("createRoom", {
-          roomId:
-            "TEST" + Math.random().toString(36).substring(2, 5).toUpperCase(),
+          roomId: "TEST",
           maxPlayers: "3",
           theme: "numbers",
           gridSize: "4x4",
