@@ -41,6 +41,7 @@ io.on("connection", (socket) => {
     }
 
     socket.join(roomId);
+
     console.log(`Room created: ${roomId} by ${socket.id}`);
     socket.emit("roomCreated", { roomId, room });
   });
