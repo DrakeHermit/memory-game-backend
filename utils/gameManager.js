@@ -1,22 +1,39 @@
 const createGameManager = () => {
-  const activeUsers = new Map();
-  const gameState = {
-    coinsFlipped: [],
-    currentPlayer: null,
-    gameOver: false,
-    winner: null,
-    grid: [],
+  const activeGames = new Map();
+
+  const createPlayer = (playerId, playerName) => ({
+    id: playerId,
+    name: playerName,
+    score: 0,
+    moves: 0,
+    hasTurn: false,
+  });
+
+  const createGame = (roomId) => ({
+    roomId,
     players: [],
-    roomId: null,
-  };
+    gameStarted: false,
+  });
 
   return {
-    isMatch(coin1, coin2) {
-      if (gameState.coinsFlipped.length === 0) return;
-      if (gameState.coinsFlipped.length > 1) {
-        const match = coin1.id === coin2.id ? true : false;
-        return match;
+    addPlayer(roomId, playerId, playerName) {
+      let game = activeGames.get(roomId);
+
+      if (!game) {
+        game = createGame(roomId);
+        activeGames.set(roomId, game);
       }
+
+      if (game.gameStarted) {
+        return { error: "Cannot add player to started game" };
+      }
+
+      const newPlayer = createPlayer(playerId, playerName);
+      game.players.push(newPlayer);
+      return { success: true, gameState: game };
     },
   };
 };
+
+const gameManager = createGameManager();
+export default gameManager;

@@ -35,17 +35,9 @@ const createRoomManager = () => {
 
       return { success: true, room };
     },
-
-    getRoom(roomId) {
-      return activeRooms.get(roomId);
-    },
-
-    getAllRooms() {
-      return Array.from(activeRooms.entries());
-    },
   };
 };
 
 const roomManager = createRoomManager();
 
-export const { createRoom, joinRoom, getRoom, getAllRooms } = roomManager;
+export const { createRoom, joinRoom } = roomManager;
