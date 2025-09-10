@@ -1,7 +1,27 @@
-const createGameManager = () => {
-  const activeGames = new Map();
+interface Player {
+  id: string;
+  name: string;
+  score: number;
+  moves: number;
+  hasTurn: boolean;
+}
 
-  const createPlayer = (playerId, playerName) => ({
+interface Game {
+  roomId: string;
+  players: Player[];
+  gameStarted: boolean;
+}
+
+interface GameResponse {
+  success?: boolean;
+  error?: string;
+  gameState?: Game;
+}
+
+const createGameManager = () => {
+  const activeGames = new Map<string, Game>();
+
+  const createPlayer = (playerId: string, playerName: string): Player => ({
     id: playerId,
     name: playerName,
     score: 0,
@@ -9,14 +29,14 @@ const createGameManager = () => {
     hasTurn: false,
   });
 
-  const createGame = (roomId) => ({
+  const createGame = (roomId: string): Game => ({
     roomId,
     players: [],
     gameStarted: false,
   });
 
   return {
-    addPlayer(roomId, playerId, playerName) {
+    addPlayer(roomId: string, playerId: string, playerName: string): GameResponse {
       let game = activeGames.get(roomId);
 
       if (!game) {

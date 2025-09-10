@@ -5,9 +5,19 @@ import dotenv from "dotenv";
 import {
   createRoom,
   joinRoom,
-  getRoom,
-  getAllRooms,
 } from "./utils/roomManager.js";
+
+interface CreateRoomData {
+  roomId: string;
+  maxPlayers: number;
+  theme: string;
+  gridSize: number;
+}
+
+interface JoinRoomData {
+  roomId: string;
+  playerName: string;
+}
 
 dotenv.config();
 
@@ -27,12 +37,14 @@ const io = new Server(server, {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+
+
 io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
   });
 
-  socket.on("createRoom", ({ roomId, maxPlayers, theme, gridSize }) => {
+  socket.on("createRoom", ({ roomId, maxPlayers, theme, gridSize }: CreateRoomData) => {
     const room = createRoom(roomId, maxPlayers, theme, gridSize, socket.id);
 
     if (room.error) {
@@ -46,7 +58,7 @@ io.on("connection", (socket) => {
     socket.emit("roomCreated", { roomId, room });
   });
 
-  socket.on("joinRoom", ({ roomId, playerName }) => {
+  socket.on("joinRoom", ({ roomId, playerName }: JoinRoomData) => {
     const room = joinRoom(roomId, socket.id, playerName);
 
     if (room.error) {
@@ -61,8 +73,8 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("playerJoined", {
       playerId: socket.id,
       playerName,
-      currentPlayers: room.currentPlayers,
-      maxPlayers: room.maxPlayers,
+      currentPlayers: room.room?.currentPlayers,
+      maxPlayers: room.room?.maxPlayers,
     });
   });
 });

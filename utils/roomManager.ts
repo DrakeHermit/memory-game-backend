@@ -1,15 +1,38 @@
+interface Room {
+  id: string;
+  maxPlayers: number;
+  currentPlayers: number;
+  theme: string;
+  gridSize: number;
+  players: string[];
+  host: string;
+  status: "waiting" | "playing" | "finished";
+}
+
+interface RoomResponse {
+  success?: boolean;
+  error?: string;
+  room?: Room;
+}
+
 const createRoomManager = () => {
-  const activeRooms = new Map();
+  const activeRooms = new Map<string, Room>();
 
   return {
-    createRoom(roomId, maxPlayers, theme, gridSize, hostId) {
+    createRoom(
+      roomId: string, 
+      maxPlayers: number, 
+      theme: string, 
+      gridSize: number, 
+      hostId: string
+    ): RoomResponse {
       if (activeRooms.has(roomId)) {
         return { error: "Room already exists" };
       }
 
-      const room = {
+      const room: Room = {
         id: roomId,
-        maxPlayers: parseInt(maxPlayers),
+        maxPlayers: maxPlayers,
         currentPlayers: 1,
         theme,
         gridSize,
@@ -22,7 +45,7 @@ const createRoomManager = () => {
       return { success: true, room };
     },
 
-    joinRoom(roomId, playerId, playerName) {
+    joinRoom(roomId: string, playerId: string, playerName: string): RoomResponse {
       const room = activeRooms.get(roomId);
 
       if (!room) return { error: "Room not found" };
