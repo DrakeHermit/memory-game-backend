@@ -6,12 +6,14 @@ import {
   createRoom,
   joinRoom,
 } from "./utils/roomManager.js";
+import gameManager from "./utils/gameManager.js";
 
 interface CreateRoomData {
   roomId: string;
   maxPlayers: number;
   theme: string;
   gridSize: number;
+  playerName: string;
 }
 
 interface JoinRoomData {
@@ -44,11 +46,18 @@ io.on("connection", (socket) => {
     console.log(`User disconnected: ${socket.id}`);
   });
 
-  socket.on("createRoom", ({ roomId, maxPlayers, theme, gridSize }: CreateRoomData) => {
+  socket.on("createRoom", ({ roomId, maxPlayers, theme, gridSize, playerName }: CreateRoomData) => {
     const room = createRoom(roomId, maxPlayers, theme, gridSize, socket.id);
 
     if (room.error) {
       socket.emit("roomError", { message: room.error });
+      return;
+    }
+
+    // Add room creator to game state
+    const gameResult = gameManager.addPlayer(roomId, socket.id, playerName);
+    if (gameResult.error) {
+      socket.emit("roomError", { message: gameResult.error });
       return;
     }
 
@@ -66,6 +75,13 @@ io.on("connection", (socket) => {
       return;
     }
 
+    // Add player to game state
+    const gameResult = gameManager.addPlayer(roomId, socket.id, playerName);
+    if (gameResult.error) {
+      socket.emit("roomError", { message: gameResult.error });
+      return;
+    }
+
     socket.join(roomId);
 
     console.log(`Player ${socket.id} joined room ${roomId}`);
@@ -76,6 +92,32 @@ io.on("connection", (socket) => {
       currentPlayers: room.room?.currentPlayers,
       maxPlayers: room.room?.maxPlayers,
     });
+  });
+
+  socket.on("changePlayerName", ({ roomId, newName }: { roomId: string; newName: string }) => {
+    const result = gameManager.changePlayerName(roomId, socket.id, newName);
+    
+    if (result.error) {
+      socket.emit("nameChangeError", { message: result.error });
+      return;
+    }
+    
+    // Broadcast to everyone in the room
+    io.to(roomId).emit("playerNameChanged", { 
+      playerId: socket.id, 
+      newName 
+    });
+  });
+
+  socket.on("getGameState", ({ roomId }: { roomId: string }) => {
+    const result = gameManager.getGameState(roomId);
+    
+    if (result.error) {
+      socket.emit("gameStateError", { message: result.error });
+      return;
+    }
+    
+    socket.emit("gameState", result);
   });
 });
 

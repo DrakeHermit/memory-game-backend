@@ -52,6 +52,22 @@ const createGameManager = () => {
       game.players.push(newPlayer);
       return { success: true, gameState: game };
     },
+    changePlayerName(roomId: string, playerId: string, newName: string): GameResponse {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      
+      const player = game.players.find(p => p.id === playerId);
+      if (!player) return { error: "Player not found" };
+      
+      player.name = newName;
+      return { success: true, gameState: game };
+    },
+
+    getGameState(roomId: string): GameResponse {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      return { success: true, gameState: game };
+    }
   };
 };
 
