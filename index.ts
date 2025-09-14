@@ -10,7 +10,7 @@ import gameManager from "./utils/gameManager.js";
 
 interface CreateRoomData {
   roomId: string;
-  maxPlayers: number;
+  maxPlayers: string;
   theme: string;
   gridSize: number;
   playerName: string;
@@ -39,15 +39,14 @@ const io = new Server(server, {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-
 io.on("connection", (socket) => {
+  console.log(`User connected: ${socket.id}`);
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
   });
 
   socket.on("createRoom", ({ roomId, maxPlayers, theme, gridSize, playerName }: CreateRoomData) => {
-    const room = createRoom(roomId, maxPlayers, theme, gridSize, socket.id);
+    const room = createRoom(roomId, parseInt(maxPlayers), theme, gridSize, socket.id);
 
     if (room.error) {
       socket.emit("roomError", { message: room.error });
@@ -67,6 +66,7 @@ io.on("connection", (socket) => {
     socket.emit("roomCreated", { roomId, room });
   });
 
+
   socket.on("joinRoom", ({ roomId, playerName }: JoinRoomData) => {
     const room = joinRoom(roomId, socket.id, playerName);
 
@@ -75,14 +75,15 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Add player to game state
-    const gameResult = gameManager.addPlayer(roomId, socket.id, playerName);
-    if (gameResult.error) {
-      socket.emit("roomError", { message: gameResult.error });
-      return;
-    }
+    console.log('Join attempt - roomId:', roomId, 'playerName:', playerName);
 
+    const gameResult = gameManager.addPlayer(roomId, socket.id, playerName);
     socket.join(roomId);
+
+
+    if (!gameResult.error) {
+      io.to(roomId).emit("gameState", gameResult); 
+    }
 
     console.log(`Player ${socket.id} joined room ${roomId}`);
 
@@ -102,7 +103,6 @@ io.on("connection", (socket) => {
       return;
     }
     
-    // Broadcast to everyone in the room
     io.to(roomId).emit("playerNameChanged", { 
       playerId: socket.id, 
       newName 
