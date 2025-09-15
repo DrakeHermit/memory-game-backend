@@ -62,8 +62,11 @@ io.on("connection", (socket) => {
 
     socket.join(roomId);
 
-    console.log(`Room created: ${roomId} by ${socket.id}`);
+    console.log(`Room created: ${roomId} by ${socket.id} (${playerName})`);
     socket.emit("roomCreated", { roomId, room });
+    
+    // Emit game state so the room creator appears in the players list
+    socket.emit("gameState", gameResult);
   });
 
 
@@ -74,8 +77,6 @@ io.on("connection", (socket) => {
       socket.emit("roomError", { message: room.error });
       return;
     }
-
-    console.log('Join attempt - roomId:', roomId, 'playerName:', playerName);
 
     const gameResult = gameManager.addPlayer(roomId, socket.id, playerName);
     socket.join(roomId);
