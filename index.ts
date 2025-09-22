@@ -108,6 +108,18 @@ io.on("connection", (socket) => {
       playerId: socket.id, 
       newName 
     });
+    console.log(result.gameState);
+  });
+
+  socket.on("togglePlayerReady", ({ roomId }: { roomId: string }) => {
+    const result = gameManager.togglePlayerReady(roomId, socket.id);
+    
+    if (result.error) {
+      socket.emit("readyToggleError", { message: result.error });
+      return;
+    }
+    
+    io.to(roomId).emit("gameState", result);
   });
 
   socket.on("getGameState", ({ roomId }: { roomId: string }) => {
@@ -124,6 +136,6 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📡 Socket.IO server ready for connections`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Socket.IO server ready for connections`);
 });

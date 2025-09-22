@@ -4,6 +4,7 @@ interface Player {
   score: number;
   moves: number;
   hasTurn: boolean;
+  ready: boolean;
 }
 
 interface Game {
@@ -27,6 +28,7 @@ const createGameManager = () => {
     score: 0,
     moves: 0,
     hasTurn: false,
+    ready: false,
   });
 
   const createGame = (roomId: string): Game => ({
@@ -60,6 +62,17 @@ const createGameManager = () => {
       if (!player) return { error: "Player not found" };
       
       player.name = newName;
+      return { success: true, gameState: game };
+    },
+
+    togglePlayerReady(roomId: string, playerId: string): GameResponse {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      
+      const player = game.players.find(p => p.id === playerId);
+      if (!player) return { error: "Player not found" };
+      
+      player.ready = !player.ready;
       return { success: true, gameState: game };
     },
 
