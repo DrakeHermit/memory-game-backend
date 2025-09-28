@@ -19,6 +19,8 @@ interface CreateRoomData {
 interface JoinRoomData {
   roomId: string;
   playerName: string;
+  theme: string;
+  gridSize: number;
 }
 
 dotenv.config();
@@ -40,7 +42,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 io.on("connection", (socket) => {
-  console.log(`User connected: ${socket.id}`);
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
   });
@@ -54,15 +55,13 @@ io.on("connection", (socket) => {
     }
 
     // Add room creator to game state
-    const gameResult = gameManager.addPlayer(roomId, socket.id, playerName);
+    const gameResult = gameManager.addPlayer(roomId, socket.id, playerName, theme, gridSize);
     if (gameResult.error) {
       socket.emit("roomError", { message: gameResult.error });
       return;
     }
 
     socket.join(roomId);
-
-    console.log(`Room created: ${roomId} by ${socket.id} (${playerName})`);
     socket.emit("roomCreated", { roomId, room });
     
     // Emit game state so the room creator appears in the players list
@@ -70,7 +69,7 @@ io.on("connection", (socket) => {
   });
 
 
-  socket.on("joinRoom", ({ roomId, playerName }: JoinRoomData) => {
+  socket.on("joinRoom", ({ roomId, playerName, theme, gridSize }: JoinRoomData) => {
     const room = joinRoom(roomId, socket.id, playerName);
 
     if (room.error) {
@@ -78,15 +77,13 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const gameResult = gameManager.addPlayer(roomId, socket.id, playerName);
+    const gameResult = gameManager.addPlayer(roomId, socket.id, playerName, theme, gridSize);
     socket.join(roomId);
 
 
     if (!gameResult.error) {
       io.to(roomId).emit("gameState", gameResult); 
     }
-
-    console.log(`Player ${socket.id} joined room ${roomId}`);
 
     io.to(roomId).emit("playerJoined", {
       playerId: socket.id,
@@ -108,7 +105,6 @@ io.on("connection", (socket) => {
       playerId: socket.id, 
       newName 
     });
-    console.log(result.gameState);
   });
 
   socket.on("togglePlayerReady", ({ roomId }: { roomId: string }) => {
@@ -131,6 +127,19 @@ io.on("connection", (socket) => {
     }
     
     socket.emit("gameState", result);
+  });
+
+  socket.on("startGame", ({ roomId }: { roomId: string }) => {
+    const result = gameManager.startGame(roomId);
+    
+    if (result.error) {
+      socket.emit("startGameError", { message: result.error });
+      return;
+    }
+    
+    // Broadcast to all players in the room that the game has started
+    io.to(roomId).emit("gameState", result);
+    io.to(roomId).emit("gameStarted");
   });
 });
 

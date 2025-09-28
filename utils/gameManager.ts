@@ -11,12 +11,44 @@ interface Game {
   roomId: string;
   players: Player[];
   gameStarted: boolean;
+  theme: string;
+  gridSize: number;
+  coins: Array<{
+    id: number;
+    value: number | string;
+  }>;
 }
 
 interface GameResponse {
   success?: boolean;
   error?: string;
   gameState?: Game;
+}
+
+const getGridSize = (gridSize: number): number => { 
+  return gridSize;
+}
+ 
+const generateServerGrid = (gridSize: number, theme: string): Array<{
+  id: number;
+  value: number | string;
+}> => {
+  const size = getGridSize(gridSize);
+  const totalCoins = size * size;
+  const maxIcons = 10; 
+
+  const coins = Array.from({ length: totalCoins }, (_, index) => {
+    const pairIndex = Math.floor(index / 2);
+    
+    return {
+      id: index,
+      value: theme === 'numbers' 
+        ? pairIndex 
+        : `icon-${pairIndex % maxIcons}`,
+    };
+  });
+
+  return coins.sort(() => Math.random() - 0.5)
 }
 
 const createGameManager = () => {
@@ -31,18 +63,21 @@ const createGameManager = () => {
     ready: false,
   });
 
-  const createGame = (roomId: string): Game => ({
+  const createGame = (roomId: string, theme: string, gridSize: number): Game => ({
     roomId,
     players: [],
     gameStarted: false,
+    theme,
+    gridSize,
+    coins: [],
   });
 
   return {
-    addPlayer(roomId: string, playerId: string, playerName: string): GameResponse {
+    addPlayer(roomId: string, playerId: string, playerName: string, theme: string, gridSize: number): GameResponse {
       let game = activeGames.get(roomId);
 
       if (!game) {
-        game = createGame(roomId);
+        game = createGame(roomId, theme, gridSize);
         activeGames.set(roomId, game);
       }
 
@@ -73,6 +108,30 @@ const createGameManager = () => {
       if (!player) return { error: "Player not found" };
       
       player.ready = !player.ready;
+      return { success: true, gameState: game };
+    },
+
+    startGame(roomId: string): GameResponse {
+       const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      
+      if (game.gameStarted) return { error: "Game already started" };
+      
+      // Check if all players are ready
+      const allGuestsReady = game.players.slice(1).every(p => p.ready);
+      if (game.players.length > 1 && !allGuestsReady) {
+        return { error: "Not all players are ready" };
+      }
+      
+      // Generate the game grid on server
+      game.coins = generateServerGrid(game.gridSize, game.theme);
+      game.gameStarted = true;
+      
+      // Set first player's turn
+      if (game.players.length > 0) {
+        game.players[0].hasTurn = true;
+      }
+      
       return { success: true, gameState: game };
     },
 
