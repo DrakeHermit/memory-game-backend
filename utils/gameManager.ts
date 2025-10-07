@@ -25,6 +25,18 @@ interface GameResponse {
   gameState?: Game;
 }
 
+export const shuffleArray = <T>(array: T[]): T[] => {
+  const shuffled = [...array]; 
+  
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  
+  return shuffled;
+}
+
 const getGridSize = (gridSize: number): number => { 
   return gridSize;
 }
@@ -48,7 +60,7 @@ const generateServerGrid = (gridSize: number, theme: string): Array<{
     };
   });
 
-  return coins.sort(() => Math.random() - 0.5)
+  return shuffleArray(coins);
 }
 
 const createGameManager = () => {
@@ -112,22 +124,19 @@ const createGameManager = () => {
     },
 
     startGame(roomId: string): GameResponse {
-       const game = activeGames.get(roomId);
+      const game = activeGames.get(roomId);
       if (!game) return { error: "Game not found" };
       
       if (game.gameStarted) return { error: "Game already started" };
       
-      // Check if all players are ready
       const allGuestsReady = game.players.slice(1).every(p => p.ready);
       if (game.players.length > 1 && !allGuestsReady) {
         return { error: "Not all players are ready" };
       }
       
-      // Generate the game grid on server
       game.coins = generateServerGrid(game.gridSize, game.theme);
       game.gameStarted = true;
       
-      // Set first player's turn
       if (game.players.length > 0) {
         game.players[0].hasTurn = true;
       }
