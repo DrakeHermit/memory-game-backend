@@ -11,6 +11,9 @@ interface Game {
   roomId: string;
   players: Player[];
   gameStarted: boolean;
+  flippedCoins: number[];
+  matchedPairs: number[];
+  isProcessing: boolean;
   theme: string;
   gridSize: number;
   coins: Array<{
@@ -79,6 +82,9 @@ const createGameManager = () => {
     roomId,
     players: [],
     gameStarted: false,
+    flippedCoins: [],
+    matchedPairs: [],
+    isProcessing: false,
     theme,
     gridSize,
     coins: [],
@@ -111,7 +117,6 @@ const createGameManager = () => {
       player.name = newName;
       return { success: true, gameState: game };
     },
-
     togglePlayerReady(roomId: string, playerId: string): GameResponse {
       const game = activeGames.get(roomId);
       if (!game) return { error: "Game not found" };
@@ -122,7 +127,6 @@ const createGameManager = () => {
       player.ready = !player.ready;
       return { success: true, gameState: game };
     },
-
     startGame(roomId: string): GameResponse {
       const game = activeGames.get(roomId);
       if (!game) return { error: "Game not found" };
@@ -143,10 +147,47 @@ const createGameManager = () => {
       
       return { success: true, gameState: game };
     },
-
     getGameState(roomId: string): GameResponse {
       const game = activeGames.get(roomId);
       if (!game) return { error: "Game not found" };
+      return { success: true, gameState: game };
+    },
+    checkForMatch(game: Game): void {
+      const coin1 = game.coins.find(c => c.id === game.flippedCoins[0]);
+      const coin2 = game.coins.find(c => c.id === game.flippedCoins[1]);
+      const currentPlayer = game.players.find(p => p.hasTurn);
+      
+      if (currentPlayer) currentPlayer.moves++;
+      
+      if (coin1?.value === coin2?.value) {
+        // MATCH
+        if (currentPlayer) currentPlayer.score++;
+        game.matchedPairs.push(coin1?.id ?? 0, coin2?.id ?? 0);
+        game.flippedCoins = [];
+        // Rotate turn
+        const currentIndex = game.players.findIndex(p => p.hasTurn);
+        const nextIndex = (currentIndex + 1) % game.players.length;
+        game.players[currentIndex].hasTurn = false;
+        game.players[nextIndex].hasTurn = true;
+      } else {
+        const currentIndex = game.players.findIndex(p => p.hasTurn);
+        const nextIndex = (currentIndex + 1) % game.players.length;
+        game.players[currentIndex].hasTurn = false;
+        game.players[nextIndex].hasTurn = true;
+        // TODO: setTimeout to clear flippedCoins after 1s
+      }
+    },
+    flipCoin(roomId: string, playerId: string, coinId: number): GameResponse {
+      const game = activeGames.get(roomId);
+      const player = game?.players.find(p => p.id === playerId);
+      if (!game) return { error: "Game not found" };
+      if (game.flippedCoins.length === 2) return { error: "Cannot flip more than 2 coins" };
+      if (!player) return { error: "Player not found" };
+      if (!player?.hasTurn) return { error: "Not your turn" };
+      if (game.flippedCoins.includes(coinId)) return { error: "Coin already flipped" };
+      if(game.matchedPairs.includes(coinId)) return { error: "Coin already matched" };
+      game.flippedCoins.push(coinId);
+      if(game.flippedCoins.length === 2) this.checkForMatch(game);
       return { success: true, gameState: game };
     }
   };
