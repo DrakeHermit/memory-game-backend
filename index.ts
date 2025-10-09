@@ -54,7 +54,6 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Add room creator to game state
     const gameResult = gameManager.addPlayer(roomId, socket.id, playerName, theme, gridSize);
     if (gameResult.error) {
       socket.emit("roomError", { message: gameResult.error });
@@ -67,7 +66,6 @@ io.on("connection", (socket) => {
     // Emit game state so the room creator appears in the players list
     socket.emit("gameState", gameResult);
   });
-
 
   socket.on("joinRoom", ({ roomId, playerName, theme, gridSize }: JoinRoomData) => {
     const room = joinRoom(roomId, socket.id, playerName);
@@ -140,6 +138,17 @@ io.on("connection", (socket) => {
     // Broadcast to all players in the room that the game has started
     io.to(roomId).emit("gameState", result);
     io.to(roomId).emit("gameStarted");
+  });
+
+  socket.on("flipCoin", ({ roomId, coinId }: { roomId: string; playerId: string; coinId: number }) => {
+    const result = gameManager.flipCoin(roomId, socket.id, coinId);
+    
+    if (result.error) {
+      socket.emit("flipCoinError", { message: result.error });
+      return;
+    }
+    
+    io.to(roomId).emit("gameState", result);
   });
 });
 
