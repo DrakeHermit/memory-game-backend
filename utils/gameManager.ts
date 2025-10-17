@@ -170,6 +170,7 @@ const createGameManager = () => {
         game.players[currentIndex].hasTurn = false;
         game.players[nextIndex].hasTurn = true;
       } else {
+        game.flippedCoins = []; 
         const currentIndex = game.players.findIndex(p => p.hasTurn);
         const nextIndex = (currentIndex + 1) % game.players.length;
         game.players[currentIndex].hasTurn = false;
@@ -179,6 +180,7 @@ const createGameManager = () => {
     },
     flipCoin(roomId: string, playerId: string, coinId: number): GameResponse {
       const game = activeGames.get(roomId);
+      console.log("Flipping coin:", coinId);
       const player = game?.players.find(p => p.id === playerId);
       if (!game) return { error: "Game not found" };
       if (game.flippedCoins.length === 2) return { error: "Cannot flip more than 2 coins" };
