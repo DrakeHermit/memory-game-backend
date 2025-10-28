@@ -135,7 +135,6 @@ io.on("connection", (socket) => {
       return;
     }
     
-    // Broadcast to all players in the room that the game has started
     io.to(roomId).emit("gameState", result);
     io.to(roomId).emit("gameStarted");
   });

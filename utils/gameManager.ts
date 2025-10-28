@@ -179,19 +179,25 @@ const createGameManager = () => {
       }
     },
     flipCoin(roomId: string, playerId: string, coinId: number): GameResponse {
-      const game = activeGames.get(roomId);
-      console.log("Flipping coin:", coinId);
-      const player = game?.players.find(p => p.id === playerId);
+      const game = activeGames.get(roomId)
       if (!game) return { error: "Game not found" };
-      if (game.flippedCoins.length === 2) return { error: "Cannot flip more than 2 coins" };
+      const player = game?.players.find(p => p.id === playerId);
       if (!player) return { error: "Player not found" };
       if (!player?.hasTurn) return { error: "Not your turn" };
-      if (game.flippedCoins.includes(coinId)) return { error: "Coin already flipped" };
-      if(game.matchedPairs.includes(coinId)) return { error: "Coin already matched" };
-      game.flippedCoins.push(coinId);
-      if(game.flippedCoins.length === 2) this.checkForMatch(game);
+      if(game.flippedCoins.length === 2) return { error: "Cannot flip more than 2 coins" };
+      if (game && player && player.hasTurn && game.flippedCoins.length < 2) {
+        console.log("Flipping coin:", coinId);
+        game.flippedCoins.push(coinId);
+        console.log("Flipped coins:", game?.flippedCoins);
+      }
+      if (game.flippedCoins.length === 2) {
+        console.log("Checking for match");
+        console.log("Flipped coins:", game?.flippedCoins);
+        game.isProcessing = true;
+        this.checkForMatch(game);
+      } 
       return { success: true, gameState: game };
-    }
+    },
   };
 };
 
