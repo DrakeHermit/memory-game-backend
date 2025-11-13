@@ -171,7 +171,7 @@ io.on("connection", (socket) => {
 
         const updateState = gameManager.getGameState(roomId);
         io.to(roomId).emit("gameState", updateState);
-      }, 1500);
+      }, 800);
     }
   });
 });
