@@ -63,7 +63,6 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     socket.emit("roomCreated", { roomId, room });
     
-    // Emit game state so the room creator appears in the players list
     socket.emit("gameState", gameResult);
   });
 
@@ -148,6 +147,32 @@ io.on("connection", (socket) => {
     }
     
     io.to(roomId).emit("gameState", result);
+
+    if (result.shouldCheckForMatch) {
+      const gameState = gameManager.getGameState(roomId);
+      const flippedCoins = gameState.gameState?.flippedCoins || [];
+
+      setTimeout(() => {
+        const matchResult = gameManager.checkForMatch(roomId);
+
+        if('error' in matchResult) {
+          socket.emit("checkForMatchError", { message: matchResult.error });
+          return;
+        }
+
+        if (!matchResult.isMatch && matchResult.coinsToFlipBack) {
+          io.to(roomId).emit("flipCoinsBack", matchResult.coinsToFlipBack);
+        }
+
+        const gameState = gameManager.getGameState(roomId);
+        if (gameState.gameState) {
+          gameState.gameState.isProcessing = false;
+        }
+
+        const updateState = gameManager.getGameState(roomId);
+        io.to(roomId).emit("gameState", updateState);
+      }, 1500);
+    }
   });
 });
 

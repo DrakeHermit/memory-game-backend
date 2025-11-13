@@ -26,6 +26,7 @@ interface GameResponse {
   success?: boolean;
   error?: string;
   gameState?: Game;
+  shouldCheckForMatch?: boolean;
 }
 
 export const shuffleArray = <T>(array: T[]): T[] => {
@@ -152,30 +153,34 @@ const createGameManager = () => {
       if (!game) return { error: "Game not found" };
       return { success: true, gameState: game };
     },
-    checkForMatch(game: Game): void {
-      const coin1 = game.coins.find(c => c.id === game.flippedCoins[0]);
-      const coin2 = game.coins.find(c => c.id === game.flippedCoins[1]);
-      const currentPlayer = game.players.find(p => p.hasTurn);
+    checkForMatch(roomId: string): { isMatch: boolean, coinsToFlipBack?: number[] } | { error: string } {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      const coin1 = game?.coins.find(c => c.id === game?.flippedCoins[0]);
+      const coin2 = game?.coins.find(c => c.id === game?.flippedCoins[1]);
+      const currentPlayer = game?.players.find(p => p.hasTurn);
       
       if (currentPlayer) currentPlayer.moves++;
       
       if (coin1?.value === coin2?.value) {
-        // MATCH
         if (currentPlayer) currentPlayer.score++;
-        game.matchedPairs.push(coin1?.id ?? 0, coin2?.id ?? 0);
+        game?.matchedPairs.push(coin1?.id ?? 0, coin2?.id ?? 0);
         game.flippedCoins = [];
-        // Rotate turn
         const currentIndex = game.players.findIndex(p => p.hasTurn);
         const nextIndex = (currentIndex + 1) % game.players.length;
         game.players[currentIndex].hasTurn = false;
         game.players[nextIndex].hasTurn = true;
+        console.log("Match found");
+        return {isMatch: true}
       } else {
-        game.flippedCoins = []; 
+        console.log("No match found");
+        const coinsToFlipBack = [...game.flippedCoins];
+        game.flippedCoins = [];
         const currentIndex = game.players.findIndex(p => p.hasTurn);
         const nextIndex = (currentIndex + 1) % game.players.length;
         game.players[currentIndex].hasTurn = false;
         game.players[nextIndex].hasTurn = true;
-        // TODO: setTimeout to clear flippedCoins after 1s
+        return {isMatch: false, coinsToFlipBack};
       }
     },
     flipCoin(roomId: string, playerId: string, coinId: number): GameResponse {
@@ -194,7 +199,7 @@ const createGameManager = () => {
         console.log("Checking for match");
         console.log("Flipped coins:", game?.flippedCoins);
         game.isProcessing = true;
-        this.checkForMatch(game);
+        return { success: true, gameState: game, shouldCheckForMatch: true };
       } 
       return { success: true, gameState: game };
     },
