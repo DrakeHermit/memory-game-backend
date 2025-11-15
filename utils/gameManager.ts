@@ -2,6 +2,7 @@ interface Player {
   id: string;
   name: string;
   score: number;
+  pairsFound: number;
   moves: number;
   hasTurn: boolean;
   ready: boolean;
@@ -74,6 +75,7 @@ const createGameManager = () => {
     id: playerId,
     name: playerName,
     score: 0,
+    pairsFound: 0,
     moves: 0,
     hasTurn: false,
     ready: false,
@@ -163,7 +165,13 @@ const createGameManager = () => {
       if (currentPlayer) currentPlayer.moves++;
       
       if (coin1?.value === coin2?.value) {
-        if (currentPlayer) currentPlayer.score++;
+        if (currentPlayer) {
+          currentPlayer.score += 10;
+          currentPlayer.pairsFound++;
+          console.log("Pairs found:", currentPlayer.pairsFound);
+          console.log("Score:", currentPlayer.score);
+          console.log("Player info", game?.players);
+        }
         game?.matchedPairs.push(coin1?.id ?? 0, coin2?.id ?? 0);
         game.flippedCoins = [];
         const currentIndex = game.players.findIndex(p => p.hasTurn);
