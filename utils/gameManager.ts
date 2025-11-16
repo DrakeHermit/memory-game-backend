@@ -12,6 +12,7 @@ interface Game {
   roomId: string;
   players: Player[];
   gameStarted: boolean;
+  gameOver: boolean;
   flippedCoins: number[];
   matchedPairs: number[];
   isProcessing: boolean;
@@ -85,6 +86,7 @@ const createGameManager = () => {
     roomId,
     players: [],
     gameStarted: false,
+    gameOver: false,
     flippedCoins: [],
     matchedPairs: [],
     isProcessing: false,
@@ -209,6 +211,20 @@ const createGameManager = () => {
         game.isProcessing = true;
         return { success: true, gameState: game, shouldCheckForMatch: true };
       } 
+      return { success: true, gameState: game };
+    },
+    gameOver(roomId: string): GameResponse {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      game.gameOver = true;
+      game.gameStarted = false;
+      game.players.forEach(player => {
+        player.hasTurn = false;
+        player.ready = false;
+      });
+      game.flippedCoins = [];
+      game.matchedPairs = [];
+      game.coins = [];
       return { success: true, gameState: game };
     },
   };
