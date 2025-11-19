@@ -164,13 +164,25 @@ io.on("connection", (socket) => {
           io.to(roomId).emit("flipCoinsBack", matchResult.coinsToFlipBack);
         }
 
-        const gameState = gameManager.getGameState(roomId);
         if (gameState.gameState) {
-          gameState.gameState.isProcessing = false;
+          const gameState = gameManager.getGameState(roomId);
+          gameState!.gameState!.isProcessing = false;
         }
 
         const updateState = gameManager.getGameState(roomId);
         io.to(roomId).emit("gameState", updateState);
+
+        const gridSize = updateState.gameState?.gridSize ?? 0;
+        const matchedPairs = updateState.gameState?.matchedPairs.length ?? 0;
+        const totalCoins = gridSize * gridSize;
+        
+        console.log(matchedPairs, totalCoins, "matchedPairs / totalCoins");
+        
+        if (matchedPairs === totalCoins) {
+          gameManager.gameOver(roomId);
+          console.log("Game over");
+          io.to(roomId).emit("gameOver");
+        }
       }, 800);
     }
   });
