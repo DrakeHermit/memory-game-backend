@@ -181,6 +181,7 @@ io.on("connection", (socket) => {
         if (matchedPairs === totalCoins) {
           gameManager.gameOver(roomId);
           console.log("Game over");
+          io.to(roomId).emit("gameState", updateState);
           io.to(roomId).emit("gameOver");
         }
       }, 800);

@@ -213,9 +213,24 @@ const createGameManager = () => {
       } 
       return { success: true, gameState: game };
     },
+    getWinner(roomId: string): { winner?: Player, winners: Player[], isTie: boolean } | { error: string } {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      
+      const maxScore = Math.max(...game.players.map(p => p.score));
+      const winners = game.players.filter(p => p.score === maxScore);
+      
+      if (winners.length === 1) {
+        return { winner: winners[0], winners, isTie: false };
+      } else {
+        return { winners, isTie: true };
+      }
+    },
     gameOver(roomId: string): GameResponse {
       const game = activeGames.get(roomId);
       if (!game) return { error: "Game not found" };
+      const winnerData = this.getWinner(roomId);
+      console.log("Winner data:", winnerData);
       game.gameOver = true;
       game.gameStarted = false;
       game.players.forEach(player => {
@@ -225,7 +240,7 @@ const createGameManager = () => {
       game.flippedCoins = [];
       game.matchedPairs = [];
       game.coins = [];
-      return { success: true, gameState: game };
+      return { success: true, gameState: game, ...winnerData };
     },
   };
 };
