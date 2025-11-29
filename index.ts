@@ -150,7 +150,6 @@ io.on("connection", (socket) => {
 
     if (result.shouldCheckForMatch) {
       const gameState = gameManager.getGameState(roomId);
-      const flippedCoins = gameState.gameState?.flippedCoins || [];
 
       setTimeout(() => {
         const matchResult = gameManager.checkForMatch(roomId);
@@ -176,13 +175,11 @@ io.on("connection", (socket) => {
         const matchedPairs = updateState.gameState?.matchedPairs.length ?? 0;
         const totalCoins = gridSize * gridSize;
         
-        console.log(matchedPairs, totalCoins, "matchedPairs / totalCoins");
         
         if (matchedPairs === totalCoins) {
-          gameManager.gameOver(roomId);
+          const finalState = gameManager.gameOver(roomId);
           console.log("Game over");
-          io.to(roomId).emit("gameState", updateState);
-          io.to(roomId).emit("gameOver");
+          io.to(roomId).emit("gameState", finalState);
         }
       }, 800);
     }

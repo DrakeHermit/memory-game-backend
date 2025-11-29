@@ -22,6 +22,9 @@ interface Game {
     id: number;
     value: number | string;
   }>;
+  winner: Player | null;
+  winners: Player[];
+  isTie: boolean;
 }
 
 interface GameResponse {
@@ -93,6 +96,9 @@ const createGameManager = () => {
     theme,
     gridSize,
     coins: [],
+    winner: null,
+    winners: [],
+    isTie: false,
   });
 
   return {
@@ -170,9 +176,6 @@ const createGameManager = () => {
         if (currentPlayer) {
           currentPlayer.score += 10;
           currentPlayer.pairsFound++;
-          console.log("Pairs found:", currentPlayer.pairsFound);
-          console.log("Score:", currentPlayer.score);
-          console.log("Player info", game?.players);
         }
         game?.matchedPairs.push(coin1?.id ?? 0, coin2?.id ?? 0);
         game.flippedCoins = [];
@@ -180,10 +183,8 @@ const createGameManager = () => {
         const nextIndex = (currentIndex + 1) % game.players.length;
         game.players[currentIndex].hasTurn = false;
         game.players[nextIndex].hasTurn = true;
-        console.log("Match found");
         return {isMatch: true}
       } else {
-        console.log("No match found");
         const coinsToFlipBack = [...game.flippedCoins];
         game.flippedCoins = [];
         const currentIndex = game.players.findIndex(p => p.hasTurn);
@@ -201,46 +202,35 @@ const createGameManager = () => {
       if (!player?.hasTurn) return { error: "Not your turn" };
       if(game.flippedCoins.length === 2) return { error: "Cannot flip more than 2 coins" };
       if (game && player && player.hasTurn && game.flippedCoins.length < 2) {
-        console.log("Flipping coin:", coinId);
         game.flippedCoins.push(coinId);
-        console.log("Flipped coins:", game?.flippedCoins);
       }
       if (game.flippedCoins.length === 2) {
-        console.log("Checking for match");
-        console.log("Flipped coins:", game?.flippedCoins);
         game.isProcessing = true;
         return { success: true, gameState: game, shouldCheckForMatch: true };
       } 
       return { success: true, gameState: game };
     },
-    getWinner(roomId: string): { winner?: Player, winners: Player[], isTie: boolean } | { error: string } {
+    gameOver(roomId: string): GameResponse {
       const game = activeGames.get(roomId);
       if (!game) return { error: "Game not found" };
       
       const maxScore = Math.max(...game.players.map(p => p.score));
       const winners = game.players.filter(p => p.score === maxScore);
       
-      if (winners.length === 1) {
-        return { winner: winners[0], winners, isTie: false };
-      } else {
-        return { winners, isTie: true };
-      }
-    },
-    gameOver(roomId: string): GameResponse {
-      const game = activeGames.get(roomId);
-      if (!game) return { error: "Game not found" };
-      const winnerData = this.getWinner(roomId);
-      console.log("Winner data:", winnerData);
+      game.isTie = winners.length > 1;
+      game.winners = winners;
+      game.winner = game.isTie ? null : winners[0];
+      
+      console.log("Winner data:", { winner: game.winner, winners: game.winners, isTie: game.isTie });
+      
       game.gameOver = true;
       game.gameStarted = false;
       game.players.forEach(player => {
         player.hasTurn = false;
         player.ready = false;
       });
-      game.flippedCoins = [];
-      game.matchedPairs = [];
-      game.coins = [];
-      return { success: true, gameState: game, ...winnerData };
+      
+      return { success: true, gameState: game };
     },
   };
 };
