@@ -6,7 +6,6 @@ interface Room {
   gridSize: number;
   players: string[];
   host: string;
-  status: "waiting" | "playing" | "finished";
 }
 
 interface RoomResponse {
@@ -38,7 +37,6 @@ const createRoomManager = () => {
         gridSize,
         players: [hostId],
         host: hostId,
-        status: "waiting",
       };
 
       activeRooms.set(roomId, room);
@@ -51,16 +49,21 @@ const createRoomManager = () => {
       if (!room) return { error: "Room not found" };
       if (room.players.includes(playerId)) return { error: "Already in room" };
       if (room.currentPlayers >= room.maxPlayers) return { error: "Room full" };
-      if (room.status !== "waiting") return { error: "Game in progress" };
 
       room.currentPlayers++;
       room.players.push(playerId);
 
       return { success: true, room };
     },
+    removeRoom(roomId: string): RoomResponse {
+      const room = activeRooms.get(roomId);
+      if (!room) return { error: "Room not found" };
+      activeRooms.delete(roomId);
+      return { success: true };
+    }
   };
 };
 
 const roomManager = createRoomManager();
 
-export const { createRoom, joinRoom } = roomManager;
+export const { createRoom, joinRoom, removeRoom } = roomManager;

@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import {
   createRoom,
   joinRoom,
+  removeRoom,
 } from "./utils/roomManager.js";
 import gameManager from "./utils/gameManager.js";
 
@@ -182,6 +183,14 @@ io.on("connection", (socket) => {
           io.to(roomId).emit("gameState", finalState);
         }
       }, 800);
+    }
+  });
+
+  socket.on("removeRoom", ({ roomId }: { roomId: string }) => {
+    const result = removeRoom(roomId);
+    if (result.error) {
+      socket.emit("removeRoomError", { message: result.error });
+      return;
     }
   });
 });

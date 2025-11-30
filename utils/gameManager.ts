@@ -210,6 +210,12 @@ const createGameManager = () => {
       } 
       return { success: true, gameState: game };
     },
+    removeGame(roomId: string): GameResponse {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      activeGames.delete(roomId);
+      return { success: true };
+    },
     gameOver(roomId: string): GameResponse {
       const game = activeGames.get(roomId);
       if (!game) return { error: "Game not found" };
