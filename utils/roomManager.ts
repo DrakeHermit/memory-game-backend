@@ -59,6 +59,8 @@ const createRoomManager = () => {
       const room = activeRooms.get(roomId);
       if (!room) return { error: "Room not found" };
       activeRooms.delete(roomId);
+      console.log("Room removed");
+      console.log(activeRooms);
       return { success: true };
     }
   };

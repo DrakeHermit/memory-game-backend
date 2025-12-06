@@ -227,8 +227,6 @@ const createGameManager = () => {
       game.winners = winners;
       game.winner = game.isTie ? null : winners[0];
       
-      console.log("Winner data:", { winner: game.winner, winners: game.winners, isTie: game.isTie });
-      
       game.gameOver = true;
       game.gameStarted = false;
       game.players.forEach(player => {
@@ -238,6 +236,24 @@ const createGameManager = () => {
       
       return { success: true, gameState: game };
     },
+    resetGame(roomId: string): GameResponse {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      game.roomId = '';
+      game.players = [];
+      game.gameStarted = false;
+      game.gameOver = false;
+      game.flippedCoins = [];
+      game.matchedPairs = [];
+      game.isProcessing = false;
+      game.theme = '';
+      game.gridSize = 0;
+      game.coins = [];
+      game.winner = null;
+      game.winners = [];
+      game.isTie = false;
+      return { success: true, gameState: game };
+    }
   };
 };
 
