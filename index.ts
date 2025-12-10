@@ -193,6 +193,16 @@ io.on("connection", (socket) => {
       return;
     }
   });
+
+  socket.on("resetGame", ({ roomId }: { roomId: string }) => {
+    const result = gameManager.resetGame(roomId);
+    removeRoom(roomId);
+    if (result.error) {
+      socket.emit("resetGameError", { message: result.error });
+      return;
+    }
+    io.to(roomId).emit("gameState", result);
+  });
 });
 
 const PORT = process.env.PORT || 3000;
