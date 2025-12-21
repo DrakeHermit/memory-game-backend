@@ -1,21 +1,7 @@
-interface Room {
-  id: string;
-  maxPlayers: number;
-  currentPlayers: number;
-  theme: string;
-  gridSize: number;
-  players: string[];
-  host: string;
-}
-
-interface RoomResponse {
-  success?: boolean;
-  error?: string;
-  room?: Room;
-}
+import { RoomData, RoomResponse } from "../types/roomTypes";
 
 const createRoomManager = () => {
-  const activeRooms = new Map<string, Room>();
+  const activeRooms = new Map<string, RoomData>();
 
   return {
     createRoom(
@@ -29,7 +15,7 @@ const createRoomManager = () => {
         return { error: "Room already exists" };
       }
 
-      const room: Room = {
+      const room: RoomData = {
         id: roomId,
         maxPlayers: maxPlayers,
         currentPlayers: 1,
