@@ -78,6 +78,7 @@ io.on("connection", (socket) => {
     const gameResult = gameManager.addPlayer(roomId, socket.id, playerName, theme, gridSize);
     socket.join(roomId);
 
+    socket.emit("joinRoom", roomId);
 
     if (!gameResult.error) {
       io.to(roomId).emit("gameState", gameResult); 
@@ -137,6 +138,26 @@ io.on("connection", (socket) => {
     
     io.to(roomId).emit("gameState", result);
     io.to(roomId).emit("gameStarted");
+  });
+
+  socket.on("pauseGame", ({ roomId }: { roomId: string }) => {
+    const result = gameManager.pauseGame(roomId, socket.id);
+    if (result.error) {
+      socket.emit("pauseGameError", { message: result.error });
+      return;
+    }
+    io.to(roomId).emit("gameState", result);
+    io.to(roomId).emit("gamePaused");
+  });
+
+  socket.on("resumeGame", ({ roomId }: { roomId: string }) => {
+    const result = gameManager.resumeGame(roomId, socket.id);
+    if (result.error) {
+      socket.emit("resumeGameError", { message: result.error });
+      return;
+    }
+    io.to(roomId).emit("gameState", result);
+    io.to(roomId).emit("gameResumed");
   });
 
   socket.on("flipCoin", ({ roomId, coinId }: { roomId: string; playerId: string; coinId: number }) => {

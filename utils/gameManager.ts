@@ -13,6 +13,8 @@ interface Game {
   players: Player[];
   gameStarted: boolean;
   gameOver: boolean;
+  gamePaused: boolean;
+  pausedBy: Player | null;
   flippedCoins: number[];
   matchedPairs: number[];
   isProcessing: boolean;
@@ -90,6 +92,8 @@ const createGameManager = () => {
     players: [],
     gameStarted: false,
     gameOver: false,
+    gamePaused: false,
+    pausedBy: null,
     flippedCoins: [],
     matchedPairs: [],
     isProcessing: false,
@@ -253,7 +257,26 @@ const createGameManager = () => {
       game.winners = [];
       game.isTie = false;
       return { success: true, gameState: game };
-    }
+    },
+    pauseGame(roomId: string, playerId: string): GameResponse {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      const player = game.players.find(p => p.id === playerId);
+      if (!player) return { error: "Player not found" };
+      game.gamePaused = true;
+      game.pausedBy = player;
+      return { success: true, gameState: game };
+    },
+    resumeGame(roomId: string, playerId: string): GameResponse {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      if (game.pausedBy && game.pausedBy.id !== playerId) {
+        return { error: "Only the player who paused can resume" };
+      }
+      game.gamePaused = false;
+      game.pausedBy = null;
+      return { success: true, gameState: game };
+    },
   };
 };
 
