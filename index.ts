@@ -116,10 +116,10 @@ io.on("connection", (socket) => {
     
     const gameResult = gameManager.removePlayer(roomId, socket.id);
     
-    console.log("Player left room", socket.id);
-    console.log("Players in room", result.room?.players);
-    socket.leave(roomId);
-    
+    console.log(`[Socket] Player leaving room: ${socket.id} from ${roomId}`);
+    console.log(`[Socket] Remaining players in room:`, result.room?.players);
+    console.log(`[Socket] Game players after removal:`, gameResult.gameState?.players?.map(p => p.name));
+
     io.to(roomId).emit("playerLeftRoom", {
       playerId: socket.id,
       playerLeftDuringGame: gameResult.playerLeftDuringGame || false,
@@ -129,6 +129,8 @@ io.on("connection", (socket) => {
     if (!gameResult.error) {
       io.to(roomId).emit("gameState", { gameState: gameResult.gameState });
     }
+    
+    socket.leave(roomId);
   });
 
   socket.on("changePlayerName", ({ roomId, newName }: { roomId: string; newName: string }) => {
@@ -139,10 +141,12 @@ io.on("connection", (socket) => {
       return;
     }
     
+    console.log(`[Socket] Player name changed: ${socket.id} -> ${newName} in room ${roomId}`);
     io.to(roomId).emit("playerNameChanged", { 
       playerId: socket.id, 
       newName 
     });
+    io.to(roomId).emit("gameState", result);
   });
 
   socket.on("togglePlayerReady", ({ roomId }: { roomId: string }) => {
@@ -153,6 +157,7 @@ io.on("connection", (socket) => {
       return;
     }
     
+    console.log(`[Socket] Player toggled ready: ${socket.id} in room ${roomId}`);
     io.to(roomId).emit("gameState", result);
   });
 
@@ -171,9 +176,15 @@ io.on("connection", (socket) => {
     console.log(`[Socket] Player rejoining room: ${socket.id} -> ${roomId}`);
     socket.join(roomId);
     
+    const roomMembers = io.sockets.adapter.rooms.get(roomId);
+    console.log(`[Socket] Room ${roomId} members after rejoin:`, roomMembers ? [...roomMembers] : 'none');
+    
     const result = gameManager.getGameState(roomId);
     if (!result.error) {
+      console.log(`[Socket] Sending gameState to rejoined socket, players: ${result.gameState?.players?.length}`);
       socket.emit("gameState", result);
+    } else {
+      console.log(`[Socket] Error getting gameState for rejoin: ${result.error}`);
     }
   });
 
