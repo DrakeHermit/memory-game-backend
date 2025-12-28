@@ -8,6 +8,6 @@ services:
       - key: NODE_ENV
         value: production
       - key: FRONTEND_URL
-        sync: false 
+        sync: false
     healthCheckPath: /health
 
