@@ -53,8 +53,10 @@ app.get("/health", (_req, res) => {
 });
 
 io.on("connection", (socket) => {
+  console.log(`[Socket] User connected: ${socket.id}`);
+  
   socket.on("disconnect", () => {
-    console.log(`User disconnected: ${socket.id}`);
+    console.log(`[Socket] User disconnected: ${socket.id}`);
   });
 
   socket.on("createRoom", ({ roomId, maxPlayers, theme, gridSize, playerName }: CreateRoomData) => {
@@ -72,6 +74,7 @@ io.on("connection", (socket) => {
     }
 
     socket.join(roomId);
+    console.log(`[Socket] Room created: ${roomId} by ${socket.id}`);
     socket.emit("roomCreated", { roomId, room });
     
     socket.emit("gameState", gameResult);
@@ -87,10 +90,12 @@ io.on("connection", (socket) => {
 
     const gameResult = gameManager.addPlayer(roomId, socket.id, playerName, theme, gridSize);
     socket.join(roomId);
+    console.log(`[Socket] Player joined room: ${socket.id} -> ${roomId}`);
 
     socket.emit("joinRoom", roomId);
 
     if (!gameResult.error) {
+      console.log(`[Socket] Broadcasting gameState to room ${roomId}, players: ${gameResult.gameState?.players?.length}`);
       io.to(roomId).emit("gameState", gameResult); 
     }
 
@@ -160,6 +165,16 @@ io.on("connection", (socket) => {
     }
     
     socket.emit("gameState", result);
+  });
+
+  socket.on("rejoinRoom", ({ roomId }: { roomId: string }) => {
+    console.log(`[Socket] Player rejoining room: ${socket.id} -> ${roomId}`);
+    socket.join(roomId);
+    
+    const result = gameManager.getGameState(roomId);
+    if (!result.error) {
+      socket.emit("gameState", result);
+    }
   });
 
   socket.on("startGame", ({ roomId }: { roomId: string }) => {
