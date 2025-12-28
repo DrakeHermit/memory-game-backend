@@ -214,6 +214,37 @@ const createGameManager = () => {
       } 
       return { success: true, gameState: game };
     },
+    removePlayer(roomId: string, playerId: string): GameResponse & { playerLeftDuringGame?: boolean, leftPlayer?: Player } {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      
+      const playerIndex = game.players.findIndex(p => p.id === playerId);
+      if (playerIndex === -1) return { error: "Player not found" };
+      
+      const leftPlayer = game.players[playerIndex];
+      const wasGameInProgress = game.gameStarted && !game.gameOver;
+      
+      if (leftPlayer.hasTurn && game.players.length > 1) {
+        const nextIndex = (playerIndex + 1) % game.players.length;
+        if (nextIndex !== playerIndex) {
+          game.players[nextIndex].hasTurn = true;
+        }
+      }
+      
+      game.players = game.players.filter(p => p.id !== playerId);
+
+      if (game.pausedBy?.id === playerId) {
+        game.gamePaused = false;
+        game.pausedBy = null;
+      }
+      
+      return { 
+        success: true, 
+        gameState: game, 
+        playerLeftDuringGame: wasGameInProgress,
+        leftPlayer: leftPlayer
+      };
+    },
     removeGame(roomId: string): GameResponse {
       const game = activeGames.get(roomId);
       if (!game) return { error: "Game not found" };

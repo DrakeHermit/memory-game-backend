@@ -41,12 +41,18 @@ const createRoomManager = () => {
 
       return { success: true, room };
     },
+    leaveRoom(roomId: string, playerId: string): RoomResponse {
+      const room = activeRooms.get(roomId);
+      if (!room) return { error: "Room not found" };
+      if (!room.players.includes(playerId)) return { error: "Not in room" };
+      room.currentPlayers--;
+      room.players = room.players.filter((id) => id !== playerId);
+      return { success: true, room };
+    },
     removeRoom(roomId: string): RoomResponse {
       const room = activeRooms.get(roomId);
       if (!room) return { error: "Room not found" };
       activeRooms.delete(roomId);
-      console.log("Room removed");
-      console.log(activeRooms);
       return { success: true };
     }
   };
@@ -54,4 +60,4 @@ const createRoomManager = () => {
 
 const roomManager = createRoomManager();
 
-export const { createRoom, joinRoom, removeRoom } = roomManager;
+export const { createRoom, joinRoom, leaveRoom, removeRoom } = roomManager;

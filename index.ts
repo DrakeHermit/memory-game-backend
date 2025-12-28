@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import {
   createRoom,
   joinRoom,
+  leaveRoom,
   removeRoom,
 } from "./utils/roomManager.js";
 import gameManager from "./utils/gameManager.js";
@@ -28,19 +29,28 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:5173",
+  "http://127.0.0.1:5500",
+  "http://localhost:5500",
+].filter(Boolean) as string[];
+
 const io = new Server(server, {
   cors: {
-    origin: [
-      process.env.FRONTEND_URL || "http://localhost:5173",
-      "http://127.0.0.1:5500",
-      "http://localhost:5500",
-    ],
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
 
 io.on("connection", (socket) => {
   socket.on("disconnect", () => {
@@ -90,6 +100,30 @@ io.on("connection", (socket) => {
       currentPlayers: room.room?.currentPlayers,
       maxPlayers: room.room?.maxPlayers,
     });
+  });
+
+  socket.on("leaveRoom", ({ roomId }: { roomId: string }) => {
+    const result = leaveRoom(roomId, socket.id);
+    if (result.error) {
+      socket.emit("leaveRoomError", { message: result.error });
+      return;
+    }
+    
+    const gameResult = gameManager.removePlayer(roomId, socket.id);
+    
+    console.log("Player left room", socket.id);
+    console.log("Players in room", result.room?.players);
+    socket.leave(roomId);
+    
+    io.to(roomId).emit("playerLeftRoom", {
+      playerId: socket.id,
+      playerLeftDuringGame: gameResult.playerLeftDuringGame || false,
+      leftPlayerName: gameResult.leftPlayer?.name || "A player"
+    });
+    
+    if (!gameResult.error) {
+      io.to(roomId).emit("gameState", { gameState: gameResult.gameState });
+    }
   });
 
   socket.on("changePlayerName", ({ roomId, newName }: { roomId: string; newName: string }) => {
