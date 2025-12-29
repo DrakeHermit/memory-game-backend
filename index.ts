@@ -16,13 +16,20 @@ interface CreateRoomData {
   theme: string;
   gridSize: number;
   playerName: string;
+  playerId: string;
 }
 
 interface JoinRoomData {
   roomId: string;
   playerName: string;
-  theme: string;
-  gridSize: number;
+  playerId: string;
+  theme?: string;
+  gridSize?: number;
+}
+
+interface RegisterData {
+  playerId: string;
+  roomId?: string;
 }
 
 dotenv.config();
@@ -45,6 +52,12 @@ const io = new Server(server, {
   },
 });
 
+const playerSocketMap = new Map<string, string>();
+
+const cleanupPlayerMapping = (playerId: string): void => {
+  playerSocketMap.delete(playerId);
+};
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -53,75 +66,110 @@ app.get("/health", (_req, res) => {
 });
 
 io.on("connection", (socket) => {
-  console.log(`[Socket] User connected: ${socket.id}`);
-  
-  socket.on("disconnect", () => {
-    console.log(`[Socket] User disconnected: ${socket.id}`);
+  socket.on("register", ({ playerId, roomId }: RegisterData) => {
+    if (!playerId) {
+      socket.emit("registerError", { message: "PlayerId is required" });
+      return;
+    }
+
+    playerSocketMap.set(playerId, socket.id);
+    
+    let reconnected = false;
+    
+    if (roomId) {
+      const gameResult = gameManager.getGameState(roomId);
+      
+      if (!gameResult.error && gameResult.gameState) {
+        const existingPlayer = gameResult.gameState.players.find(p => p.id === playerId);
+        
+        if (existingPlayer) {
+          socket.join(roomId);
+          reconnected = true;
+          
+          socket.emit("gameState", gameResult);
+        }
+      
+      }
+    }
+    
+    socket.emit("registered", { success: true, reconnected });
   });
 
-  socket.on("createRoom", ({ roomId, maxPlayers, theme, gridSize, playerName }: CreateRoomData) => {
-    const room = createRoom(roomId, parseInt(maxPlayers), theme, gridSize, socket.id);
+  socket.on("createRoom", ({ roomId, maxPlayers, theme, gridSize, playerName, playerId }: CreateRoomData) => {
+    if (!playerId) {
+      socket.emit("roomError", { message: "PlayerId is required" });
+      return;
+    }
+
+    playerSocketMap.set(playerId, socket.id);
+
+    const room = createRoom(roomId, parseInt(maxPlayers), theme, gridSize, playerId);
 
     if (room.error) {
       socket.emit("roomError", { message: room.error });
       return;
     }
 
-    const gameResult = gameManager.addPlayer(roomId, socket.id, playerName, theme, gridSize);
+    const gameResult = gameManager.addPlayer(roomId, playerId, playerName, theme, gridSize);
     if (gameResult.error) {
       socket.emit("roomError", { message: gameResult.error });
       return;
     }
 
     socket.join(roomId);
-    console.log(`[Socket] Room created: ${roomId} by ${socket.id}`);
     socket.emit("roomCreated", { roomId, room });
     
     socket.emit("gameState", gameResult);
   });
 
-  socket.on("joinRoom", ({ roomId, playerName, theme, gridSize }: JoinRoomData) => {
-    const room = joinRoom(roomId, socket.id, playerName);
+  socket.on("joinRoom", ({ roomId, playerName, playerId, theme, gridSize }: JoinRoomData) => {
+    if (!playerId) {
+      socket.emit("roomError", { message: "PlayerId is required" });
+      return;
+    }
+
+    playerSocketMap.set(playerId, socket.id);
+
+    const room = joinRoom(roomId, playerId, playerName);
 
     if (room.error) {
       socket.emit("roomError", { message: room.error });
       return;
     }
 
-    const gameResult = gameManager.addPlayer(roomId, socket.id, playerName, theme, gridSize);
+    const gameResult = gameManager.addPlayer(roomId, playerId, playerName, theme || '', gridSize || 0);
     socket.join(roomId);
-    console.log(`[Socket] Player joined room: ${socket.id} -> ${roomId}`);
 
     socket.emit("joinRoom", roomId);
 
     if (!gameResult.error) {
-      console.log(`[Socket] Broadcasting gameState to room ${roomId}, players: ${gameResult.gameState?.players?.length}`);
       io.to(roomId).emit("gameState", gameResult); 
     }
 
     io.to(roomId).emit("playerJoined", {
-      playerId: socket.id,
+      playerId: playerId,
       playerName,
       currentPlayers: room.room?.currentPlayers,
       maxPlayers: room.room?.maxPlayers,
     });
   });
 
-  socket.on("leaveRoom", ({ roomId }: { roomId: string }) => {
-    const result = leaveRoom(roomId, socket.id);
+  socket.on("leaveRoom", ({ roomId, playerId }: { roomId: string; playerId: string }) => {
+    if (!playerId) {
+      socket.emit("leaveRoomError", { message: "PlayerId is required" });
+      return;
+    }
+
+    const result = leaveRoom(roomId, playerId);
     if (result.error) {
       socket.emit("leaveRoomError", { message: result.error });
       return;
     }
     
-    const gameResult = gameManager.removePlayer(roomId, socket.id);
+    const gameResult = gameManager.removePlayer(roomId, playerId);
     
-    console.log(`[Socket] Player leaving room: ${socket.id} from ${roomId}`);
-    console.log(`[Socket] Remaining players in room:`, result.room?.players);
-    console.log(`[Socket] Game players after removal:`, gameResult.gameState?.players?.map(p => p.name));
-
     io.to(roomId).emit("playerLeftRoom", {
-      playerId: socket.id,
+      playerId: playerId,
       playerLeftDuringGame: gameResult.playerLeftDuringGame || false,
       leftPlayerName: gameResult.leftPlayer?.name || "A player"
     });
@@ -131,37 +179,47 @@ io.on("connection", (socket) => {
     }
     
     socket.leave(roomId);
+    
+    cleanupPlayerMapping(playerId);
   });
 
-  socket.on("changePlayerName", ({ roomId, newName }: { roomId: string; newName: string }) => {
-    const result = gameManager.changePlayerName(roomId, socket.id, newName);
+  socket.on("changePlayerName", ({ roomId, newName, playerId }: { roomId: string; newName: string; playerId: string }) => {
+    if (!playerId) {
+      socket.emit("nameChangeError", { message: "PlayerId is required" });
+      return;
+    }
+
+    const result = gameManager.changePlayerName(roomId, playerId, newName);
     
     if (result.error) {
       socket.emit("nameChangeError", { message: result.error });
       return;
     }
     
-    console.log(`[Socket] Player name changed: ${socket.id} -> ${newName} in room ${roomId}`);
     io.to(roomId).emit("playerNameChanged", { 
-      playerId: socket.id, 
+      playerId: playerId, 
       newName 
     });
     io.to(roomId).emit("gameState", result);
   });
 
-  socket.on("togglePlayerReady", ({ roomId }: { roomId: string }) => {
-    const result = gameManager.togglePlayerReady(roomId, socket.id);
+  socket.on("togglePlayerReady", ({ roomId, playerId }: { roomId: string; playerId: string }) => {
+    if (!playerId) {
+      socket.emit("readyToggleError", { message: "PlayerId is required" });
+      return;
+    }
+
+    const result = gameManager.togglePlayerReady(roomId, playerId);
     
     if (result.error) {
       socket.emit("readyToggleError", { message: result.error });
       return;
     }
     
-    console.log(`[Socket] Player toggled ready: ${socket.id} in room ${roomId}`);
     io.to(roomId).emit("gameState", result);
   });
 
-  socket.on("getGameState", ({ roomId }: { roomId: string }) => {
+  socket.on("getGameState", ({ roomId, playerId }: { roomId: string; playerId?: string }) => {
     const result = gameManager.getGameState(roomId);
     
     if (result.error) {
@@ -172,23 +230,18 @@ io.on("connection", (socket) => {
     socket.emit("gameState", result);
   });
 
-  socket.on("rejoinRoom", ({ roomId }: { roomId: string }) => {
-    console.log(`[Socket] Player rejoining room: ${socket.id} -> ${roomId}`);
+  socket.on("rejoinRoom", ({ roomId, playerId }: { roomId: string; playerId?: string }) => {
     socket.join(roomId);
     
     const roomMembers = io.sockets.adapter.rooms.get(roomId);
-    console.log(`[Socket] Room ${roomId} members after rejoin:`, roomMembers ? [...roomMembers] : 'none');
     
     const result = gameManager.getGameState(roomId);
     if (!result.error) {
-      console.log(`[Socket] Sending gameState to rejoined socket, players: ${result.gameState?.players?.length}`);
       socket.emit("gameState", result);
-    } else {
-      console.log(`[Socket] Error getting gameState for rejoin: ${result.error}`);
-    }
+    } 
   });
 
-  socket.on("startGame", ({ roomId }: { roomId: string }) => {
+  socket.on("startGame", ({ roomId, playerId }: { roomId: string; playerId?: string }) => {
     const result = gameManager.startGame(roomId);
     
     if (result.error) {
@@ -200,8 +253,13 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("gameStarted");
   });
 
-  socket.on("pauseGame", ({ roomId }: { roomId: string }) => {
-    const result = gameManager.pauseGame(roomId, socket.id);
+  socket.on("pauseGame", ({ roomId, playerId }: { roomId: string; playerId: string }) => {
+    if (!playerId) {
+      socket.emit("pauseGameError", { message: "PlayerId is required" });
+      return;
+    }
+
+    const result = gameManager.pauseGame(roomId, playerId);
     if (result.error) {
       socket.emit("pauseGameError", { message: result.error });
       return;
@@ -210,8 +268,13 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("gamePaused");
   });
 
-  socket.on("resumeGame", ({ roomId }: { roomId: string }) => {
-    const result = gameManager.resumeGame(roomId, socket.id);
+  socket.on("resumeGame", ({ roomId, playerId }: { roomId: string; playerId: string }) => {
+    if (!playerId) {
+      socket.emit("resumeGameError", { message: "PlayerId is required" });
+      return;
+    }
+
+    const result = gameManager.resumeGame(roomId, playerId);
     if (result.error) {
       socket.emit("resumeGameError", { message: result.error });
       return;
@@ -220,8 +283,13 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("gameResumed");
   });
 
-  socket.on("flipCoin", ({ roomId, coinId }: { roomId: string; playerId: string; coinId: number }) => {
-    const result = gameManager.flipCoin(roomId, socket.id, coinId);
+  socket.on("flipCoin", ({ roomId, coinId, playerId }: { roomId: string; playerId: string; coinId: number }) => {
+    if (!playerId) {
+      socket.emit("flipCoinError", { message: "PlayerId is required" });
+      return;
+    }
+
+    const result = gameManager.flipCoin(roomId, playerId, coinId);
     
     if (result.error) {
       socket.emit("flipCoinError", { message: result.error });
@@ -260,22 +328,25 @@ io.on("connection", (socket) => {
         
         if (matchedPairs === totalCoins) {
           const finalState = gameManager.gameOver(roomId);
-          console.log("Game over");
           io.to(roomId).emit("gameState", finalState);
         }
-      }, 800);
+      }, 500);
     }
   });
 
-  socket.on("removeRoom", ({ roomId }: { roomId: string }) => {
+  socket.on("removeRoom", ({ roomId, playerId }: { roomId: string; playerId?: string }) => {
     const result = removeRoom(roomId);
     if (result.error) {
       socket.emit("removeRoomError", { message: result.error });
       return;
     }
+    
+    if (playerId) {
+      cleanupPlayerMapping(playerId);
+    }
   });
 
-  socket.on("resetGame", ({ roomId }: { roomId: string }) => {
+  socket.on("resetGame", ({ roomId, playerId }: { roomId: string; playerId?: string }) => {
     const result = gameManager.resetGame(roomId);
     if (result.error) {
       socket.emit("resetGameError", { message: result.error });
@@ -284,6 +355,10 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("gameState", result);
     io.to(roomId).emit("gameReset");
     removeRoom(roomId);
+    
+    if (playerId) {
+      cleanupPlayerMapping(playerId);
+    }
   });
 });
 
