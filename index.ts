@@ -341,6 +341,20 @@ io.on("connection", (socket) => {
       return;
     }
     
+    gameManager.removeGame(roomId);
+    
+    io.to(roomId).emit("roomRemoved", { roomId });
+    
+    const roomSockets = io.sockets.adapter.rooms.get(roomId);
+    if (roomSockets) {
+      roomSockets.forEach((socketId) => {
+        const socketInRoom = io.sockets.sockets.get(socketId);
+        if (socketInRoom) {
+          socketInRoom.leave(roomId);
+        }
+      });
+    }
+    
     if (playerId) {
       cleanupPlayerMapping(playerId);
     }
