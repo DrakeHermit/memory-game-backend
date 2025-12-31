@@ -232,9 +232,7 @@ io.on("connection", (socket) => {
 
   socket.on("rejoinRoom", ({ roomId, playerId }: { roomId: string; playerId?: string }) => {
     socket.join(roomId);
-    
-    const roomMembers = io.sockets.adapter.rooms.get(roomId);
-    
+  
     const result = gameManager.getGameState(roomId);
     if (!result.error) {
       socket.emit("gameState", result);
@@ -367,7 +365,6 @@ io.on("connection", (socket) => {
       return;
     }
     io.to(roomId).emit("gameState", result);
-    io.to(roomId).emit("gameReset");
     removeRoom(roomId);
     
     if (playerId) {
