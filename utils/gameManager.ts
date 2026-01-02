@@ -27,6 +27,11 @@ interface Game {
   winner: Player | null;
   winners: Player[];
   isTie: boolean;
+
+  resetRequested: boolean;
+  resetRequestedBy: Player | null;
+  resetVotes: Record<string, boolean>; 
+  resetUsed: boolean; 
 }
 
 interface GameResponse {
@@ -34,6 +39,12 @@ interface GameResponse {
   error?: string;
   gameState?: Game;
   shouldCheckForMatch?: boolean;
+}
+
+interface ResetVoteResponse extends GameResponse {
+  allVoted?: boolean;
+  allAccepted?: boolean;
+  declinedBy?: Player;
 }
 
 export const shuffleArray = <T>(array: T[]): T[] => {
@@ -103,6 +114,10 @@ const createGameManager = () => {
     winner: null,
     winners: [],
     isTie: false,
+    resetRequested: false,
+    resetRequestedBy: null,
+    resetVotes: {},
+    resetUsed: false,
   });
 
   return {
@@ -237,6 +252,14 @@ const createGameManager = () => {
         game.gamePaused = false;
         game.pausedBy = null;
       }
+
+      // If a player leaves during a reset vote, cancel the reset
+      if (game.resetRequested) {
+        game.resetRequested = false;
+        game.resetRequestedBy = null;
+        game.resetVotes = {};
+        game.resetUsed = true;
+      }
       
       return { 
         success: true, 
@@ -306,6 +329,104 @@ const createGameManager = () => {
       }
       game.gamePaused = false;
       game.pausedBy = null;
+      return { success: true, gameState: game };
+    },
+    requestReset(roomId: string, playerId: string): GameResponse {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      
+      const player = game.players.find(p => p.id === playerId);
+      if (!player) return { error: "Player not found" };
+      
+      if (game.resetUsed) {
+        return { error: "Reset has already been used this game" };
+      }
+      
+      if (game.resetRequested) {
+        return { error: "Reset already requested" };
+      }
+      
+      game.resetRequested = true;
+      game.resetRequestedBy = player;
+      game.resetVotes = {};
+      game.resetVotes[playerId] = true;
+      
+      return { success: true, gameState: game };
+    },
+    voteReset(roomId: string, playerId: string, accepted: boolean): ResetVoteResponse {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      
+      const player = game.players.find(p => p.id === playerId);
+      if (!player) return { error: "Player not found" };
+      
+      if (!game.resetRequested) {
+        return { error: "No reset request pending" };
+      }
+      
+      game.resetVotes[playerId] = accepted;
+      
+      const allVoted = game.players.every(p => game.resetVotes[p.id] !== undefined);
+      
+      if (!allVoted) {
+        return { success: true, gameState: game, allVoted: false };
+      }
+      
+      const allAccepted = game.players.every(p => game.resetVotes[p.id] === true);
+
+      game.resetUsed = true;
+      
+      if (!allAccepted) {
+        const decliner = game.players.find(p => game.resetVotes[p.id] === false);
+        game.resetRequested = false;
+        game.resetRequestedBy = null;
+        game.resetVotes = {};
+        return { 
+          success: true, 
+          gameState: game, 
+          allVoted: true, 
+          allAccepted: false,
+          declinedBy: decliner
+        };
+      }
+      
+      return { success: true, gameState: game, allVoted: true, allAccepted: true };
+    },
+    executeReset(roomId: string): GameResponse {
+      const game = activeGames.get(roomId);
+      if (!game) return { error: "Game not found" };
+      
+      game.gameStarted = false;
+      game.gameOver = false;
+      game.gamePaused = false;
+      game.pausedBy = null;
+      game.flippedCoins = [];
+      game.matchedPairs = [];
+      game.isProcessing = false;
+      game.coins = [];
+      game.winner = null;
+      game.winners = [];
+      game.isTie = false;
+      game.resetRequested = false;
+      game.resetRequestedBy = null;
+      game.resetVotes = {};
+      game.resetUsed = false;
+
+      game.players.forEach(player => {
+        player.score = 0;
+        player.pairsFound = 0;
+        player.moves = 0;
+        player.hasTurn = false;
+        player.ready = false;
+      });
+      
+      game.coins = generateServerGrid(game.gridSize, game.theme);
+      
+      game.gameStarted = true;
+      if (game.players.length > 0) {
+        game.players[0].hasTurn = true;
+      }
+      
       return { success: true, gameState: game };
     },
   };

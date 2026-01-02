@@ -371,6 +371,59 @@ io.on("connection", (socket) => {
       cleanupPlayerMapping(playerId);
     }
   });
+
+  socket.on("requestReset", ({ roomId, playerId }: { roomId: string; playerId: string }) => {
+    if (!playerId) {
+      socket.emit("requestResetError", { message: "PlayerId is required" });
+      return;
+    }
+
+    const result = gameManager.requestReset(roomId, playerId);
+    if (result.error) {
+      socket.emit("requestResetError", { message: result.error });
+      return;
+    }
+
+    io.to(roomId).emit("resetRequested", {
+      requestedBy: result.gameState?.resetRequestedBy,
+      votes: result.gameState?.resetVotes
+    });
+    io.to(roomId).emit("gameState", result);
+  });
+
+  socket.on("voteReset", ({ roomId, playerId, accepted }: { roomId: string; playerId: string; accepted: boolean }) => {
+    if (!playerId) {
+      socket.emit("voteResetError", { message: "PlayerId is required" });
+      return;
+    }
+
+    const result = gameManager.voteReset(roomId, playerId, accepted);
+    if (result.error) {
+      socket.emit("voteResetError", { message: result.error });
+      return;
+    }
+
+    io.to(roomId).emit("resetVoteUpdate", {
+      votes: result.gameState?.resetVotes,
+      allVoted: result.allVoted
+    });
+
+    if (result.allVoted) {
+      if (result.allAccepted) {
+        const resetResult = gameManager.executeReset(roomId);
+        if (!resetResult.error) {
+          io.to(roomId).emit("resetAccepted");
+          io.to(roomId).emit("gameState", resetResult);
+          io.to(roomId).emit("gameStarted");
+        }
+      } else {
+        io.to(roomId).emit("resetDeclined", {
+          declinedBy: result.declinedBy
+        });
+        io.to(roomId).emit("gameState", result);
+      }
+    }
+  });
 });
 
 const PORT = process.env.PORT || 3000;
